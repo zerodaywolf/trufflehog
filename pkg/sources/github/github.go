@@ -436,10 +436,26 @@ func (s *Source) Enumerate(ctx context.Context, reporter sources.UnitReporter) e
 			ctx.Logger().Error(err, "error caching repo info")
 			_ = dedupeReporter.UnitErr(ctx, fmt.Errorf("error caching repo info: %w", err))
 		}
+		ctx.Logger().V(1).Info("Adding repo to scan list", "repo_url", repo)
 		s.repos = append(s.repos, repo)
 	}
 	githubReposEnumerated.WithLabelValues(s.name).Set(float64(len(s.repos)))
 	ctx.Logger().Info("Completed enumeration", "num_repos", len(s.repos), "num_orgs", s.orgsCache.Count(), "num_members", len(s.memberCache))
+	
+	// Debug: Log all repos that will be scanned
+	ctx.Logger().V(1).Info("Repositories to be scanned:")
+	for i, repoURL := range s.repos {
+		if repoInfo, ok := s.repoInfoCache.get(repoURL); ok {
+			ctx.Logger().V(1).Info("Repo for scanning", 
+				"index", i,
+				"url", repoURL,
+				"name", repoInfo.fullName,
+				"private", repoInfo.visibility == source_metadatapb.Visibility_private)
+		} else {
+			ctx.Logger().V(1).Info("Repo for scanning (no cache info)", "index", i, "url", repoURL)
+		}
+	}
+
 	// We must sort the repos so we can resume later if necessary.
 	sort.Strings(s.repos)
 	return nil
@@ -552,6 +568,39 @@ func (s *Source) enumerateWithToken(ctx context.Context, isGithubEnterprise bool
 		}
 		break
 	}
+	
+	ctx.Logger().V(1).Info("Authenticated as GitHub user", "login", ghUser.GetLogin())
+
+	// Handle the new --user and --private-repos flags
+	if len(s.conn.Users) > 0 {
+		for _, user := range s.conn.Users {
+			if s.conn.PrivateRepos {
+				// Validate that the specified user matches the authenticated user
+				// since we can only access private repos for the authenticated user
+				if user != ghUser.GetLogin() {
+					return fmt.Errorf("invalid config: --private-repos can only be used with the authenticated user. Specified user '%s' but authenticated as '%s'", user, ghUser.GetLogin())
+				}
+				
+				// Scan only private repositories for the specified user
+				if err := s.getPrivateReposByUser(ctx, user, reporter); err != nil {
+					ctx.Logger().Error(err, "Unable to fetch private repos for user", "user", user)
+				}
+			} else {
+				ctx.Logger().V(1).Info("Scanning public repositories for user", "user", user)
+				// Scan all repositories for the specified user (default behavior)
+				if err := s.getReposByUser(ctx, user, reporter); err != nil {
+					ctx.Logger().Error(err, "Unable to fetch repos for user", "user", user)
+				}
+			}
+			
+			// Add gists for the user
+			if err := s.addUserGistsToCache(ctx, user, reporter); err != nil {
+				ctx.Logger().Error(err, "Unable to fetch gists for user", "user", user)
+			}
+		}
+		// Return early if users were specified, don't do the default enumeration
+		return nil
+	}
 
 	specificScope := len(s.repos) > 0 || s.orgsCache.Count() > 0
 	if !specificScope {
@@ -641,6 +690,20 @@ func (s *Source) scan(ctx context.Context, reporter sources.ChunkReporter) error
 	var scannedCount uint64 = 1
 
 	ctx.Logger().V(2).Info("Found repos to scan", "count", len(s.repos))
+	
+	// Debug: Log all repos about to be scanned
+	ctx.Logger().V(1).Info("Starting scan of repositories:")
+	for i, repoURL := range s.repos {
+		if repoInfo, ok := s.repoInfoCache.get(repoURL); ok {
+			ctx.Logger().V(1).Info("About to scan repo", 
+				"index", i,
+				"url", repoURL,
+				"name", repoInfo.fullName,
+				"private", repoInfo.visibility == source_metadatapb.Visibility_private)
+		} else {
+			ctx.Logger().V(1).Info("About to scan repo (no cache info)", "index", i, "url", repoURL)
+		}
+	}
 
 	// If there is resume information available, limit this scan to only the repos that still need scanning.
 	reposToScan, progressIndexOffset := sources.FilterReposToResume(s.repos, s.GetProgress().EncodedResumeInfo)

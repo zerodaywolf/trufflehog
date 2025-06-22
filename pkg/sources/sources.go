@@ -297,6 +297,10 @@ type GithubConfig struct {
 	Repos []string
 	// Orgs is the list of organizations to scan.
 	Orgs []string
+	// Users is the list of users to scan.
+	Users []string
+	// PrivateRepos indicates whether to scan only private repositories (requires Users and Token).
+	PrivateRepos bool
 	// ExcludeRepos is a list of repositories to exclude from the scan.
 	ExcludeRepos []string
 	// IncludeRepos is a list of repositories to include in the scan.

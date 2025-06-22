@@ -107,6 +107,8 @@ var (
 	githubScanEndpoint          = githubScan.Flag("endpoint", "GitHub endpoint.").Default("https://api.github.com").String()
 	githubScanRepos             = githubScan.Flag("repo", `GitHub repository to scan. You can repeat this flag. Example: "https://github.com/dustin-decker/secretsandstuff"`).Strings()
 	githubScanOrgs              = githubScan.Flag("org", `GitHub organization to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanUser              = githubScan.Flag("user", `GitHub user to scan. You can repeat this flag. Example: "trufflesecurity"`).Strings()
+	githubScanPrivateRepos      = githubScan.Flag("private-repos", "Scan only private repositories owned by the specified user(s). Requires --user and --token.").Bool()
 	githubScanToken             = githubScan.Flag("token", "GitHub token. Can be provided with environment variable GITHUB_TOKEN.").Envar("GITHUB_TOKEN").String()
 	githubIncludeForks          = githubScan.Flag("include-forks", "Include forks in scan.").Bool()
 	githubIncludeMembers        = githubScan.Flag("include-members", "Include organization member repositories in scan.").Bool()
@@ -731,11 +733,27 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 		if err != nil {
 			return scanMetrics, fmt.Errorf("could not create filter: %v", err)
 		}
-		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 {
-			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization or repository")
+		if len(*githubScanOrgs) == 0 && len(*githubScanRepos) == 0 && len(*githubScanUser) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: you must specify at least one organization, repository, or user")
 		}
-		if len(*githubScanOrgs) > 0 && len(*githubScanRepos) > 0 {
-			return scanMetrics, fmt.Errorf("invalid config: you cannot specify both organizations and repositories at the same time")
+		exclusiveFlags := 0
+		if len(*githubScanOrgs) > 0 {
+			exclusiveFlags++
+		}
+		if len(*githubScanRepos) > 0 {
+			exclusiveFlags++
+		}
+		if len(*githubScanUser) > 0 {
+			exclusiveFlags++
+		}
+		if exclusiveFlags > 1 {
+			return scanMetrics, fmt.Errorf("invalid config: you cannot specify organizations, repositories, and users at the same time")
+		}
+		if *githubScanPrivateRepos && len(*githubScanUser) == 0 {
+			return scanMetrics, fmt.Errorf("invalid config: --private-repos requires --user to be specified")
+		}
+		if *githubScanPrivateRepos && *githubScanToken == "" {
+			return scanMetrics, fmt.Errorf("invalid config: --private-repos requires --token to be specified")
 		}
 
 		cfg := sources.GithubConfig{
@@ -749,6 +767,8 @@ func runSingleScan(ctx context.Context, cmd string, cfg engine.Config) (metrics,
 			IncludeRepos:               *githubIncludeRepos,
 			Repos:                      *githubScanRepos,
 			Orgs:                       *githubScanOrgs,
+			Users:                      *githubScanUser,
+			PrivateRepos:               *githubScanPrivateRepos,
 			IncludeIssueComments:       *githubScanIssueComments,
 			IncludePullRequestComments: *githubScanPRComments,
 			IncludeGistComments:        *githubScanGistComments,

@@ -244,6 +244,8 @@ message GitHub {
   }
   repeated string repositories = 5;
   repeated string organizations = 6;
+  repeated string users = 22;
+  bool private_repos = 23;
   bool scanUsers = 7;
   bool includeForks = 8;
   string head = 9;

@@ -50,7 +50,7 @@ TruffleHog classifies over 800 secret types, mapping them back to the specific i
 
 ## Validation ✅
 
-For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there’s an active present danger or not.
+For every secret TruffleHog can classify, it can also log in to confirm if that secret is live or not. This step is critical to know if there's an active present danger or not.
 
 ## Analysis 🔬
 
@@ -233,31 +233,62 @@ Expected output:
 trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments
 ```
 
-## 5: Scan an S3 bucket for verified keys
+## 5: Scan a GitHub User's Private Repositories
+
+**Scan all private repositories owned by a specific user:**
+
+```bash
+trufflehog github --user=<username> --private-repos --token=<github_token>
+```
+
+**Scan a specific user's private repositories with exclusions:**
+
+```bash
+trufflehog github --user=<username> --private-repos --token=<github_token> \
+  --exclude-repos="<username>/repo-to-exclude" \
+  --exclude-repos="<username>/another-repo"
+```
+
+**Scan private repositories with glob patterns for exclusions:**
+
+```bash
+trufflehog github --user=<username> --private-repos --token=<github_token> \
+  --exclude-repos="<username>/test-*\" \
+  --exclude-repos="<username>/*-backup"
+```
+
+**Important Notes:**
+- The `--private-repos` flag requires both `--user` and `--token` to be specified
+- The specified user must match the authenticated user (token owner)
+- Use full repository names for exclusions: `username/repository-name`
+- Glob patterns (`*`) are supported for flexible exclusions
+- This scans **only** private repositories; use `--user` without `--private-repos` to scan all public repositories
+
+## 6: Scan an S3 bucket for verified keys
 
 ```bash
 trufflehog s3 --bucket=<bucket name> --results=verified,unknown
 ```
 
-## 6: Scan S3 buckets using IAM Roles
+## 7: Scan S3 buckets using IAM Roles
 
 ```bash
 trufflehog s3 --role-arn=<iam role arn>
 ```
 
-## 7: Scan a Github Repo using SSH authentication in docker
+## 8: Scan a Github Repo using SSH authentication in docker
 
 ```bash
 docker run --rm -v "$HOME/.ssh:/root/.ssh:ro" trufflesecurity/trufflehog:latest git ssh://github.com/trufflesecurity/test_keys
 ```
 
-## 8: Scan individual files or directories
+## 9: Scan individual files or directories
 
 ```bash
 trufflehog filesystem path/to/file1.txt path/to/file2.txt path/to/dir
 ```
 
-## 9: Scan a local git repo
+## 10: Scan a local git repo
 
 Clone the git repo. For example [test keys](git@github.com:trufflesecurity/test_keys.git) repo.
 ```bash
@@ -269,13 +300,13 @@ Run trufflehog from the parent directory (outside the git repo).
 $ trufflehog git file://test_keys --results=verified,unknown
 ```
 
-## 10: Scan GCS buckets for verified secrets
+## 11: Scan GCS buckets for verified secrets
 
 ```bash
 trufflehog gcs --project-id=<project-ID> --cloud-environment --results=verified,unknown
 ```
 
-## 11: Scan a Docker image for verified secrets
+## 12: Scan a Docker image for verified secrets
 
 Use the `--image` flag multiple times to scan multiple images.
 
@@ -283,7 +314,7 @@ Use the `--image` flag multiple times to scan multiple images.
 trufflehog docker --image trufflesecurity/secrets --results=verified,unknown
 ```
 
-## 12: Scan in CI
+## 13: Scan in CI
 
 Set the `--since-commit` flag to your default branch that people merge into (ex: "main"). Set the `--branch` flag to your PR's branch name (ex: "feature-1"). Depending on the CI/CD platform you use, this value can be pulled in dynamically (ex: [CIRCLE_BRANCH in Circle CI](https://circleci.com/docs/variables/) and [TRAVIS_PULL_REQUEST_BRANCH in Travis CI](https://docs.travis-ci.com/user/environment-variables/)). If the repo is cloned and the target branch is already checked out during the CI/CD workflow, then `--branch HEAD` should be sufficient. The `--fail` flag will return an 183 error code if valid credentials are found.
 
@@ -291,7 +322,7 @@ Set the `--since-commit` flag to your default branch that people merge into (ex:
 trufflehog git file://. --since-commit main --branch feature-1 --results=verified,unknown --fail
 ```
 
-## 13: Scan a Postman workspace
+## 14: Scan a Postman workspace
 
 Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple times to scan multiple targets.
 
@@ -299,13 +330,13 @@ Use the `--workspace-id`, `--collection-id`, `--environment` flags multiple time
 trufflehog postman --token=<postman api token> --workspace-id=<workspace id>
 ```
 
-## 14: Scan a Jenkins server
+## 15: Scan a Jenkins server
 
 ```bash
 trufflehog jenkins --url https://jenkins.example.com --username admin --password admin
 ```
 
-## 15: Scan an Elasticsearch server
+## 16: Scan an Elasticsearch server
 
 ### Scan a Local Cluster
 
@@ -320,12 +351,12 @@ trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --username truffle --
 #### Connect to a local cluster with a service token
 
 ```bash
-trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --service-token ‘AAEWVaWM...Rva2VuaSDZ’
+trufflehog elasticsearch --nodes 192.168.14.3 192.168.14.4 --service-token 'AAEWVaWM...Rva2VuaSDZ'
 ```
 
 ### Scan an Elastic Cloud Cluster
 
-To scan a cluster on Elastic Cloud, you’ll need a Cloud ID and API key.
+To scan a cluster on Elastic Cloud, you'll need a Cloud ID and API key.
 
 ```bash
 trufflehog elasticsearch \
@@ -333,7 +364,7 @@ trufflehog elasticsearch \
   --api-key 'MlVtVjBZ...ZSYlduYnF1djh3NG5FQQ=='
 ```
 
-## 16. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
+## 17. Scan a GitHub Repository for Cross Fork Object References and Deleted Commits
 
 The following command will enumerate deleted and hidden commits on a GitHub repository and then scan them for secrets. This is an alpha release feature.
 
@@ -347,7 +378,7 @@ In addition to the normal TruffleHog output, the `--object-discovery` flag creat
 
 For more information on Cross Fork Object References, please [read our blog post](https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github).
 
-## 17. Scan Hugging Face
+## 18. Scan Hugging Face
 
 ### Scan a Hugging Face Model, Dataset or Space
 
@@ -369,7 +400,7 @@ trufflehog huggingface --org <orgname> --user <username>
 trufflehog huggingface --model <model_id> --include-discussions --include-prs
 ```
 
-## 18. Scan stdin Input
+## 19. Scan stdin Input
 
 ```bash
 aws s3 cp s3://example/gzipped/data.gz - | gunzip -c | trufflehog stdin

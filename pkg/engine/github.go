@@ -18,6 +18,8 @@ func (e *Engine) ScanGitHub(ctx context.Context, c sources.GithubConfig) (source
 		Endpoint:                   c.Endpoint,
 		Organizations:              c.Orgs,
 		Repositories:               c.Repos,
+		Users:                      c.Users,
+		PrivateRepos:               c.PrivateRepos,
 		ScanUsers:                  c.IncludeMembers,
 		IgnoreRepos:                c.ExcludeRepos,
 		IncludeRepos:               c.IncludeRepos,

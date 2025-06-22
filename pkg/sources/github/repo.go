@@ -89,12 +89,30 @@ type userListOptions struct {
 	github.RepositoryListByUserOptions
 }
 
+// privateUserListOptions is used for the authenticated user endpoint
+type privateUserListOptions struct {
+	github.RepositoryListOptions
+}
+
 func (u *userListOptions) getListOptions() *github.ListOptions {
-	return &u.ListOptions
+	return &u.RepositoryListByUserOptions.ListOptions
+}
+
+func (p *privateUserListOptions) getListOptions() *github.ListOptions {
+	return &p.RepositoryListOptions.ListOptions
 }
 
 func (s *Source) userListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
 	return s.connector.APIClient().Repositories.ListByUser(ctx, user, &opts.(*userListOptions).RepositoryListByUserOptions)
+}
+
+// privateUserListReposWrapper uses the authenticated user endpoint to access private repos
+func (s *Source) privateUserListReposWrapper(ctx context.Context, user string, opts repoListOptions) ([]*github.Repository, *github.Response, error) {
+	// For private repos, we need to use the authenticated user endpoint
+	// This endpoint returns repos that the authenticated user owns or has access to
+	// We pass an empty string as the user parameter to get the authenticated user's repos
+	options := &opts.(*privateUserListOptions).RepositoryListOptions
+	return s.connector.APIClient().Repositories.List(ctx, "", options)
 }
 
 func (s *Source) getReposByUser(ctx context.Context, user string, reporter sources.UnitReporter) error {
@@ -102,6 +120,18 @@ func (s *Source) getReposByUser(ctx context.Context, user string, reporter sourc
 		RepositoryListByUserOptions: github.RepositoryListByUserOptions{
 			ListOptions: github.ListOptions{
 				PerPage: defaultPagination,
+			},
+		},
+	})
+}
+
+// getPrivateReposByUser fetches only private repositories for a specific user
+func (s *Source) getPrivateReposByUser(ctx context.Context, user string, reporter sources.UnitReporter) error {
+	return s.processRepos(ctx, user, reporter, s.privateUserListReposWrapper, &privateUserListOptions{
+		RepositoryListOptions: github.RepositoryListOptions{
+			Type: "private", // Only fetch private repositories
+			ListOptions: github.ListOptions{
+				PerPage: 100, // Use maximum page size as requested
 			},
 		},
 	})

@@ -2528,6 +2528,8 @@ func (m *GitHub) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for PrivateRepos
+
 	// no validation rules for ScanUsers
 
 	// no validation rules for IncludeForks
